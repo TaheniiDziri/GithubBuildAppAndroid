@@ -26,17 +26,16 @@ jobs:
           node-version: 14
 
       - name: 🚀 Install Yarn
-        run: npm install -g yarn
+        run: npm install -g yarn@1.22.22
 
-      - name: 🧹 Clean invalid yarn.lock if needed
+      - name: 🧹 Fix corrupt yarn.lock if needed
         run: |
-          if grep -q 'Invalid value type' yarn.lock; then
-            echo "⚠️ Invalid yarn.lock detected. Removing..."
+          echo "Checking yarn.lock integrity..."
+          if ! yarn install --check-files --frozen-lockfile; then
+            echo "⚠️ yarn.lock is invalid. Deleting and reinstalling..."
             rm yarn.lock
+            yarn install
           fi
-
-      - name: 📥 Install Dependencies
-        run: yarn install
 
       - name: 🏗️ Build Android APK
         run: |
