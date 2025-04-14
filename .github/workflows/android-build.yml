@@ -13,37 +13,33 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. Checkout the code from the repository
-    - name: Checkout Code
-      uses: actions/checkout@v2
+      # 1. Checkout the code from the repository
+      - name: Checkout Code
+        uses: actions/checkout@v2
 
-    # 2. Set up Node.js
-    - name: Set up Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '16'  # Utiliser la version de Node.js adéquate
+      # 2. Set up Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'  # Utiliser la version de Node.js adéquate
 
-    # 3. Cache npm dependencies
-    - name: Cache npm dependencies
-      uses: actions/cache@v3
-      with:
-        path: ~/.npm
-        key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-npm-
+      # 3. Cache npm dependencies
+      - name: Cache npm dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
 
-    # 4. Install npm dependencies
-    - name: Install Dependencies
-      run: npm install
+      # 4. Install npm dependencies
+      - name: Install Dependencies
+        run: npm install
 
-
-
-    # 6. Build Android
-    - name: Build Android (using gradlew)
-      id: android_build
-      run: |
-        cd android
-        ./gradlew clean
-        ./gradlew assembleRelease  # ou assembleDebug selon la configuration
-
-    
+      # 5. Build Android
+      - name: Build Android (using gradlew)
+        id: android_build
+        run: |
+          cd android
+          ./gradlew clean
+          ./gradlew assembleRelease  # ou assembleDebug selon la configuration
