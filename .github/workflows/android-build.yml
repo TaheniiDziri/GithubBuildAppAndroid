@@ -25,7 +25,7 @@ jobs:
 
       # 3. Utilisation du cache pour les dépendances
       - name: Cache Node.js modules
-        uses: actions/cache@v3  # Mise à jour vers la version 3 de actions/cache
+        uses: actions/cache@v3
         with:
           path: ~/.npm
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -40,6 +40,19 @@ jobs:
       - name: Create assets directory
         run: mkdir -p android/app/src/main/assets
 
-      # 6. Construction du projet
-      - name: Build
+      # 6. Construction du bundle (React Native)
+      - name: Build Bundle
         run: npm run build
+
+      # 7. Génération du fichier APK Android
+      - name: Build APK
+        run: |
+          cd android
+          ./gradlew assembleRelease # Utilise Gradle pour assembler l'APK
+          
+      # 8. Récupération du fichier APK généré
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: android-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
