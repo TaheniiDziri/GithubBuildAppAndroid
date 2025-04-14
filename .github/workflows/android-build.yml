@@ -36,16 +36,10 @@ jobs:
     - name: Install Dependencies
       run: npm install
 
-    # 5. Install iOS dependencies (CocoaPods)
-    - name: Install iOS dependencies (CocoaPods)
-      if: runner.os == 'macos-latest'
-      run: |
-        cd ios
-        pod install --repo-update
+
 
     # 6. Build Android
     - name: Build Android (using gradlew)
-      if: runner.os == 'ubuntu-latest'
       id: android_build
       run: |
         cd android
