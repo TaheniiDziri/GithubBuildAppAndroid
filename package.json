@@ -4,7 +4,8 @@
     "private": true,
     "scripts": {
         "start": "yarn react-native start",
-        "android": "yarn react-native run-android"
+        "android": "yarn react-native run-android",
+        "build": "yarn react-native bundle --entry-file index.js --platform android --dev false --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res"
     },
     "dependencies": {
         "hermes-engine": "^0.5.0",
