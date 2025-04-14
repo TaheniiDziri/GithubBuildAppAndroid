@@ -53,14 +53,14 @@ jobs:
         ./gradlew assembleRelease  # ou assembleDebug selon la configuration
 
     # 7. Add a comment based on build status
-    - name: Comment on build status
-      run: |
-        if [ ${{ job.status }} == 'success' ]; then
-          echo "Build was successful!" >> $GITHUB_ENV
-        else
-          echo "Build failed!" >> $GITHUB_ENV
-        fi
+    - name: Check build status and comment
+      if: ${{ success() }}
+      run: echo "Build was successful!" >> $GITHUB_ENV
 
-    # 8. Show the build status
-    - name: Show build status message
+    - name: Handle failure status
+      if: ${{ failure() }}
+      run: echo "Build failed!" >> $GITHUB_ENV
+
+    # 8. Display build status
+    - name: Show build status
       run: echo "Build Status: ${{ env.BUILD_STATUS }}"
