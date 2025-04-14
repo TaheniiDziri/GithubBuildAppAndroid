@@ -25,7 +25,7 @@ jobs:
 
       # 3. Utilisation du cache pour les dépendances
       - name: Cache Node.js modules
-        uses: actions/cache@v2
+        uses: actions/cache@v3  # Mise à jour vers la version 3 de actions/cache
         with:
           path: ~/.npm
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
@@ -43,6 +43,3 @@ jobs:
       # 6. Construction du projet
       - name: Build
         run: npm run build
-
-      # 7. Déploiement (si nécessaire)
-      # Ajoutez des étapes pour déployer le projet, si applicable.
