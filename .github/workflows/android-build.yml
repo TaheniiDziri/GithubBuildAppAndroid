@@ -36,7 +36,9 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-
+      # 5. Création du répertoire pour le bundle
+      - name: Create assets directory
+        run: mkdir -p android/app/src/main/assets
 
       # 6. Construction du projet
       - name: Build
