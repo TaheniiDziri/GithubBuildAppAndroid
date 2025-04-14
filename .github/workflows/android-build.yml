@@ -31,20 +31,36 @@ jobs:
         key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
         restore-keys: |
           ${{ runner.os }}-npm-
+
     # 4. Install npm dependencies
     - name: Install Dependencies
       run: npm install
 
-    # 5. Install iOS dependencies
+    # 5. Install iOS dependencies (CocoaPods)
     - name: Install iOS dependencies (CocoaPods)
       if: runner.os == 'macos-latest'
       run: |
         cd ios
         pod install --repo-update
+
     # 6. Build Android
     - name: Build Android (using gradlew)
       if: runner.os == 'ubuntu-latest'
+      id: android_build
       run: |
         cd android
         ./gradlew clean
         ./gradlew assembleRelease  # ou assembleDebug selon la configuration
+
+    # 7. Add a comment based on build status
+    - name: Comment on build status
+      run: |
+        if [ ${{ job.status }} == 'success' ]; then
+          echo "Build was successful!" >> $GITHUB_ENV
+        else
+          echo "Build failed!" >> $GITHUB_ENV
+        fi
+
+    # 8. Show the build status
+    - name: Show build status message
+      run: echo "Build Status: ${{ env.BUILD_STATUS }}"
