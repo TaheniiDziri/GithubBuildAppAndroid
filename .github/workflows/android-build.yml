@@ -1,45 +1,33 @@
-name: Node.js Build
+name: Build Android APK
 
 on:
   push:
     branches:
       - main
   pull_request:
-    branches:
-      - main
 
 jobs:
   build:
+    name: Build APK
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Vérification du code source
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - name: Checkout repo
+        uses: actions/checkout@v3
 
-      # 2. Configuration de Node.js
       - name: Set up Node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
-          node-version: '16'  # Remplacez par la version de Node.js souhaitée
+          node-version: 18
 
-      # 3. Utilisation du cache pour les dépendances
-      - name: Cache Node.js modules
-        uses: actions/cache@v3  # Mise à jour vers la version 3 de actions/cache
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-
-      # 4. Installation des dépendances
       - name: Install dependencies
         run: npm install
 
-      # 5. Création du répertoire pour le bundle
-      - name: Create assets directory
-        run: mkdir -p android/app/src/main/assets
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: "temurin"
+          java-version: "17"
 
-      # 6. Construction du projet
-      - name: Build
-        run: npm run build 
+      - name: Grant execute permission to gradlew
+        run: chmod +x android/gradlew
