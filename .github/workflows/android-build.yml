@@ -1,49 +1,38 @@
-image: atlassian/default-image:3
+name: Build Android App
 
-pipelines:
-  default:
-    - step:
-        name: Setup environment and build
-        caches:
-          - node
-          - gradle
-        script:
-          # Install specific Node version
-          - nvm install 12.10.0
-          - nvm use 12.10.0
-          - node -v
-          
-          # Install Java 8 (required for React Native 0.60.4)
-          - apt-get update
-          - apt-get install -y openjdk-8-jdk
-          - java -version
-          
-          # Install project dependencies
-          - npm install -g react-native@0.60.4
-          - npm install
-          
-          # Setup Android SDK
-          - export ANDROID_SDK_ROOT=/usr/local/android-sdk
-          - export PATH=$PATH:$ANDROID_SDK_ROOT/tools:$ANDROID_SDK_ROOT/platform-tools
-          
-          # Accept Android licenses
-          - mkdir -p $ANDROID_SDK_ROOT/licenses
-          - echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > $ANDROID_SDK_ROOT/licenses/android-sdk-license
-          - echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> $ANDROID_SDK_ROOT/licenses/android-sdk-license
-          - echo "84831b9409646a918e30573bab4c9c91346d8abd" > $ANDROID_SDK_ROOT/licenses/android-sdk-preview-license
-          
-          # Build Android app
-          - cd android
-          - chmod +x gradlew
-          - ./gradlew clean assembleDebug
-          
-          # Store the APK as an artifact
-        artifacts:
-          - android/app/build/outputs/apk/debug/*.apk
+on:
+  push:
+    branches:
+      - main
+  pull_request:
 
-definitions:
-  caches:
-    node: 
-      - ~/.npm
-      - ~/.nvm
-    gradle: ~/.gradle
+jobs:
+  build:
+    name: Build on Ubuntu
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: 11
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 14
+
+      - name: Install Yarn
+        run: npm install -g yarn
+
+      - name: Install Dependencies
+        run: yarn install
+
+      - name: Build Android APK
+        run: |
+          cd android
+          ./gradlew assembleDebug
