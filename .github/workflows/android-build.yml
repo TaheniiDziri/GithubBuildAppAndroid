@@ -52,7 +52,7 @@ jobs:
 
       # 8. Récupération du fichier APK généré
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3  # Mise à jour vers la version 3
         with:
           name: android-apk
           path: android/app/build/outputs/apk/release/app-release.apk
