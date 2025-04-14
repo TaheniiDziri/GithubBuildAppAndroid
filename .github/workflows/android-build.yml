@@ -1,56 +1,48 @@
-name: Build React Native Android App
+name: Node.js Build
 
 on:
   push:
     branches:
-      - main  # Déclenche le pipeline lors des push sur la branche principale
+      - main
   pull_request:
     branches:
-      - main  # Déclenche le pipeline lors des pull requests sur la branche principale
+      - main
 
 jobs:
   build:
-    runs-on: ubuntu-latest  # Utilisation d'un environnement Ubuntu pour exécuter le pipeline
+    runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v2  # Récupérer le code source depuis le dépôt
+      # 1. Vérification du code source
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v2
-      with:
-        node-version: '14'  # Définir la version de Node.js souhaitée
+      # 2. Configuration de Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '16'  # Remplacez par la version de Node.js souhaitée
 
-    - name: Install dependencies using Yarn
-      run: |
-        curl -o- -L https://yarnpkg.com/install.sh | bash  # Installer Yarn si nécessaire
-        yarn install  # Installer les dépendances du projet
+      # 3. Utilisation du cache pour les dépendances
+      - name: Cache Node.js modules
+        uses: actions/cache@v2
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
 
-    - name: Cache Node.js modules
-      uses: actions/cache@v2
-      with:
-        path: ~/.yarn/cache  # Mettre en cache les modules Yarn pour accélérer les futures builds
-        key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}  # Clé de cache basée sur yarn.lock
-        restore-keys: |
-          ${{ runner.os }}-yarn-
+      # 4. Installation des dépendances
+      - name: Install dependencies
+        run: npm install
 
-    - name: Install Android dependencies
-      run: |
-        sudo apt-get install -y openjdk-11-jdk  # Installer JDK 11 nécessaire pour Android
-        echo "y" | sdkmanager --licenses  # Accepter les licences Android SDK
-        sdkmanager "platforms;android-30" "build-tools;30.0.3"  # Installer les outils Android nécessaires
+      # 5. Exécution des tests
+      - name: Run tests
+        run: npm test
 
-    - name: Build APK
-      run: |
-        yarn react-native run-android --variant=release  # Construire l'APK pour la release
+      # 6. Construction du projet
+      - name: Build
+        run: npm run build
 
-    - name: Upload APK as Artifact
-      uses: actions/upload-artifact@v2
-      with:
-        name: android-app
-        path: android/app/build/outputs/apk/release/app-release.apk  # Upload du fichier APK
-
-    - name: Clean up
-      run: |
-        yarn cache clean  # Nettoyer le cache après le build
-
+      # 7. Déploiement (si nécessaire)
+      # Ajoutez des étapes pour déployer le projet, si applicable.
