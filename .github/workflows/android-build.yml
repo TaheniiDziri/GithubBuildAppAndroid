@@ -1,49 +1,56 @@
-name: Build Android App
+name: Build React Native Android App
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main  # Déclenche le pipeline lors des push sur la branche principale
   pull_request:
+    branches:
+      - main  # Déclenche le pipeline lors des pull requests sur la branche principale
 
 jobs:
   build:
-    name: Android Build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # Utilisation d'un environnement Ubuntu pour exécuter le pipeline
 
     steps:
-      - name: 📦 Checkout Repository
-        uses: actions/checkout@v3
+    - name: Checkout Code
+      uses: actions/checkout@v2  # Récupérer le code source depuis le dépôt
 
-      - name: ☕ Set up Java 11
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'temurin'
-          java-version: 11
+    - name: Set up Node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: '14'  # Définir la version de Node.js souhaitée
 
-      - name: 🔧 Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 14
+    - name: Install dependencies using Yarn
+      run: |
+        curl -o- -L https://yarnpkg.com/install.sh | bash  # Installer Yarn si nécessaire
+        yarn install  # Installer les dépendances du projet
 
-      - name: 🚀 Install Yarn
-        run: npm install -g yarn@1.22.22
+    - name: Cache Node.js modules
+      uses: actions/cache@v2
+      with:
+        path: ~/.yarn/cache  # Mettre en cache les modules Yarn pour accélérer les futures builds
+        key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}  # Clé de cache basée sur yarn.lock
+        restore-keys: |
+          ${{ runner.os }}-yarn-
 
-      - name: 🧹 Fix corrupt yarn.lock if needed
-        run: |
-          echo "Checking yarn.lock integrity..."
-          if ! yarn install --check-files --frozen-lockfile; then
-            echo "⚠️ yarn.lock is invalid. Deleting and reinstalling..."
-            rm yarn.lock
-            yarn install
-          fi
+    - name: Install Android dependencies
+      run: |
+        sudo apt-get install -y openjdk-11-jdk  # Installer JDK 11 nécessaire pour Android
+        echo "y" | sdkmanager --licenses  # Accepter les licences Android SDK
+        sdkmanager "platforms;android-30" "build-tools;30.0.3"  # Installer les outils Android nécessaires
 
-      - name: 🏗️ Build Android APK
-        run: |
-          cd android
-          ./gradlew assembleDebug
+    - name: Build APK
+      run: |
+        yarn react-native run-android --variant=release  # Construire l'APK pour la release
 
-      - name: 📤 Upload APK Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+    - name: Upload APK as Artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: android-app
+        path: android/app/build/outputs/apk/release/app-release.apk  # Upload du fichier APK
+
+    - name: Clean up
+      run: |
+        yarn cache clean  # Nettoyer le cache après le build
+
