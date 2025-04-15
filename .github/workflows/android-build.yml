@@ -16,34 +16,21 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    # Set up Node.js
     - name: Set up Node.js
       uses: actions/setup-node@v3
       with:
         node-version: '16'
 
-    # Install Yarn
-    - name: Install Yarn
+    - name: Install dependencies
       run: |
         npm install -g yarn
+        yarn install
 
-    # Clean up yarn.lock and node_modules if they exist
-    - name: Remove yarn.lock and node_modules
-      run: |
-        rm -rf node_modules
-        rm -f yarn.lock
-
-    # Install dependencies
-    - name: Install dependencies
-      run: yarn install
-
-    # Build the React Native app
     - name: Build release APK
       run: yarn android --variant=release
 
-    # Optionally, upload the artifact (APK) to GitHub
     - name: Upload APK artifact
-      uses: actions/upload-artifact@v2 # Utilise la version 2 qui est plus stable
+      uses: actions/upload-artifact@v3  # Essayer la version v3
       with:
         name: android-release-apk
         path: android/app/build/outputs/apk/release/app-release.apk
