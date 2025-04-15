@@ -24,7 +24,7 @@ jobs:
 
       - name: Install npm dependencies
         run: |
-          npm ci
+          npm ci --legacy-peer-deps  # Ignore les conflits de dépendances
           cd android && ./gradlew clean
 
       - name: Set up JDK 17
@@ -54,6 +54,13 @@ jobs:
             -keysize 2048 \
             -validity 10000 \
             -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: Ensure Android folder is set up
+        run: |
+          # Si le répertoire android n'existe pas, génère-le via React Native
+          if [ ! -d "android" ]; then
+            npx react-native upgrade
+          fi
 
       - name: Build Android app
         run: |
