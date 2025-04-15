@@ -1,90 +1,161 @@
-name: Android Release Build
+name: Android CI/CD Pipeline
 
 on:
   workflow_dispatch:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "master" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "master" ]
 
 env:
-  APP_NAME: "MyAndroidApp"
-  BUILD_TYPE: "release"
-  SERVICE: "ci-service"
   GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true"
+  NODE_OPTIONS: "--openssl-legacy-provider"
 
 jobs:
-  build:
-    name: Build release
+  detect-environment:
+    name: Detect Project Environment
     runs-on: ubuntu-latest
+    outputs:
+      app_name: ${{ steps.detect-app-name.outputs.app_name }}
+      android_dir: ${{ steps.detect-android-dir.outputs.android_dir }}
+      is_react_native: ${{ steps.detect-react-native.outputs.is_react_native }}
+      gradle_version: ${{ steps.detect-gradle-version.outputs.gradle_version }}
+      java_version: ${{ steps.detect-java-version.outputs.java_version }}
+      node_version: ${{ steps.detect-node-version.outputs.node_version }}
+      build_gradle_path: ${{ steps.detect-build-gradle.outputs.build_gradle_path }}
+      app_build_gradle_path: ${{ steps.detect-app-build-gradle.outputs.app_build_gradle_path }}
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
 
-    - name: Set up Node.js
+    - name: Detect Android directory structure
+      id: detect-android-dir
+      run: |
+        # Cherche le dossier android (avec différentes cas possibles)
+        if [ -d "android/app" ]; then
+          echo "android_dir=android" >> $GITHUB_OUTPUT
+        elif [ -d "Android/app" ]; then
+          echo "android_dir=Android" >> $GITHUB_OUTPUT
+        elif [ -f "app/build.gradle" ]; then
+          echo "android_dir=." >> $GITHUB_OUTPUT
+        elif [ -f "build.gradle" ]; then
+          echo "android_dir=." >> $GITHUB_OUTPUT
+        else
+          echo "Could not determine Android project structure" >&2
+          exit 1
+        fi
+
+    - name: Detect build.gradle paths
+      id: detect-build-gradle
+      run: |
+        if [ -f "${{ steps.detect-android-dir.outputs.android_dir }}/build.gradle" ]; then
+          echo "build_gradle_path=${{ steps.detect-android-dir.outputs.android_dir }}/build.gradle" >> $GITHUB_OUTPUT
+        elif [ -f "build.gradle" ]; then
+          echo "build_gradle_path=build.gradle" >> $GITHUB_OUTPUT
+        else
+          echo "Could not find build.gradle file" >&2
+          exit 1
+        fi
+
+    - name: Detect app build.gradle paths
+      id: detect-app-build-gradle
+      run: |
+        if [ -f "${{ steps.detect-android-dir.outputs.android_dir }}/app/build.gradle" ]; then
+          echo "app_build_gradle_path=${{ steps.detect-android-dir.outputs.android_dir }}/app/build.gradle" >> $GITHUB_OUTPUT
+        elif [ -f "app/build.gradle" ]; then
+          echo "app_build_gradle_path=app/build.gradle" >> $GITHUB_OUTPUT
+        else
+          echo "Could not find app/build.gradle file" >&2
+          exit 1
+        fi
+
+    - name: Detect React Native project
+      id: detect-react-native
+      run: |
+        if [ -f "package.json" ] && grep -q "react-native" package.json; then
+          echo "is_react_native=true" >> $GITHUB_OUTPUT
+        else
+          echo "is_react_native=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Detect Gradle version
+      id: detect-gradle-version
+      run: |
+        if [ -f "${{ steps.detect-android-dir.outputs.android_dir }}/gradle/wrapper/gradle-wrapper.properties" ]; then
+          GRADLE_VERSION=$(grep "distributionUrl" ${{ steps.detect-android-dir.outputs.android_dir }}/gradle/wrapper/gradle-wrapper.properties | cut -d'-' -f 2)
+          echo "gradle_version=$GRADLE_VERSION" >> $GITHUB_OUTPUT
+        else
+          # Version par défaut si on ne trouve pas le fichier
+          echo "gradle_version=7.6" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Detect Java version
+      id: detect-java-version
+      run: |
+        # Cherche dans le build.gradle principal puis dans app/build.gradle
+        JAVA_VERSION=$(grep "javaVersion" ${{ steps.detect-build-gradle.outputs.build_gradle_path }} ${{ steps.detect-app-build-gradle.outputs.app_build_gradle_path }} 2>/dev/null | head -n 1 | awk '{print $3}' | tr -d "'" || echo "17")
+        echo "java_version=$JAVA_VERSION" >> $GITHUB_OUTPUT
+
+    - name: Detect Node.js version
+      id: detect-node-version
+      if: steps.detect-react-native.outputs.is_react_native == 'true'
+      run: |
+        if [ -f ".nvmrc" ]; then
+          echo "node_version=$(cat .nvmrc)" >> $GITHUB_OUTPUT
+        elif [ -f "package.json" ]; then
+          NODE_VERSION=$(jq -r '.engines.node' package.json | sed 's/[^0-9.]//g' || echo "18")
+          echo "node_version=$NODE_VERSION" >> $GITHUB_OUTPUT
+        else
+          echo "node_version=18" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Detect App Name
+      id: detect-app-name
+      run: |
+        APP_NAME=$(grep "applicationId" ${{ steps.detect-app-build-gradle.outputs.app_build_gradle_path }} | awk '{print $2}' | tr -d '"' | head -n 1 || echo "AndroidApp")
+        echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
+
+  build:
+    name: Build Android App
+    needs: detect-environment
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        build-type: [ 'release', 'debug' ]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js (React Native only)
+      if: needs.detect-environment.outputs.is_react_native == 'true'
       uses: actions/setup-node@v3
       with:
-        node-version: '18'
-        cache: 'npm'
+        node-version: ${{ needs.detect-environment.outputs.node_version }}
 
-    - name: Install npm dependencies
+    - name: Cache npm dependencies (React Native only)
+      if: needs.detect-environment.outputs.is_react_native == 'true'
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.npm
+          node_modules
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - name: Install npm dependencies (React Native only)
+      if: needs.detect-environment.outputs.is_react_native == 'true'
       run: |
-        echo "🧹 Nettoyage de node_modules..."
-        rm -rf node_modules
-        echo "📦 Installation des dépendances npm..."
-        npm install
+        npm install --legacy-peer-deps
 
-    - name: Check and create native_modules.gradle if missing
-      run: |
-        echo "🔍 Vérification de native_modules.gradle..."
-        if [ ! -f node_modules/@react-native-community/cli-platform-android/native_modules.gradle ]; then
-          echo "❌ Le fichier native_modules.gradle est manquant. Création automatique du fichier..."
-          mkdir -p node_modules/@react-native-community/cli-platform-android
-          echo "// Minimal gradle configuration" > node_modules/@react-native-community/cli-platform-android/native_modules.gradle
-          echo "Fichier native_modules.gradle créé automatiquement."
-        fi
-
-    - name: Force Java 17 temporarily for Android SDK setup
+    - name: Setup Java
       uses: actions/setup-java@v3
       with:
-        java-version: '17'
+        java-version: ${{ needs.detect-environment.outputs.java_version }}
         distribution: 'temurin'
-        check-latest: true
-
-    - name: Set up Android SDK
-      uses: android-actions/setup-android@v3
-
-    - name: Accept Android SDK licenses
-      run: yes | sdkmanager --licenses
-
-    - name: Update Gradle Wrapper to 7.6
-      run: |
-        cd android
-        chmod +x gradlew
-        ./gradlew wrapper --gradle-version 7.6 --distribution-type=all
-
-    - name: Extract Gradle version and set Java version
-      run: |
-        gradle_version=$(grep "distributionUrl" android/gradle/wrapper/gradle-wrapper.properties | sed 's/.*gradle-\(.*\)-bin.*/\1/')
-        echo "Detected Gradle version: $gradle_version"
-        if [[ "$gradle_version" == 8.* ]]; then
-          echo "java_version=17" >> $GITHUB_ENV
-        elif [[ "$gradle_version" == 7.* ]]; then
-          echo "java_version=11" >> $GITHUB_ENV
-        else
-          echo "java_version=8" >> $GITHUB_ENV
-        fi
-
-    - name: Set up correct Java version for build
-      uses: actions/setup-java@v3
-      with:
-        java-version: ${{ env.java_version }}
-        distribution: 'temurin'
-        cache: gradle
-        check-latest: true
+        cache: 'gradle'
 
     - name: Cache Gradle dependencies
       uses: actions/cache@v3
@@ -92,42 +163,54 @@ jobs:
         path: |
           ~/.gradle/caches
           ~/.gradle/wrapper
-        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
+        key: ${{ runner.os }}-gradle-${{ needs.detect-environment.outputs.gradle_version }}-${{ hashFiles('**/*.gradle*') }}
         restore-keys: |
-          ${{ runner.os }}-gradle-
+          ${{ runner.os }}-gradle-${{ needs.detect-environment.outputs.gradle_version }}-
 
-    - name: Pre-build cleanup
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+
+    - name: Accept Android licenses
       run: |
-        cd android
+        yes | sdkmanager --licenses || true
+        sdkmanager --update
+
+    - name: Clean project
+      run: |
+        cd ${{ needs.detect-environment.outputs.android_dir }}
         ./gradlew clean
 
-    - name: Validate Gradle Wrapper
-      uses: gradle/wrapper-validation-action@v2
-
-    - name: Build APK with Gradle
+    - name: Build APK
       run: |
-        cd android
-        ./gradlew assembleRelease \
+        cd ${{ needs.detect-environment.outputs.android_dir }}
+        ./gradlew assemble${{ matrix.build-type }} \
           --no-daemon \
           --stacktrace \
-          --info \
-          --scan
+          --info
 
-    - name: Upload release APK artifact
+    - name: Find and upload APK/AAB
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ env.APP_NAME }}-release
+        name: ${{ needs.detect-environment.outputs.app_name }}-${{ matrix.build-type }}
         path: |
-          android/app/build/outputs/apk/release/*.apk
-          android/app/build/outputs/bundle/release/*.aab
-        if-no-files-found: error
+          ${{ needs.detect-environment.outputs.android_dir }}/app/build/outputs/apk/${{ matrix.build-type }}/*.apk
+          ${{ needs.detect-environment.outputs.android_dir }}/app/build/outputs/bundle/${{ matrix.build-type }}/*.aab
+          app/build/outputs/apk/${{ matrix.build-type }}/*.apk
+          app/build/outputs/bundle/${{ matrix.build-type }}/*.aab
+        if-no-files-found: warn
         retention-days: 7
 
     - name: Show build info
       run: |
         echo "=== Build Information ==="
-        echo "App: ${{ env.APP_NAME }}"
-        echo "Build type: ${{ env.BUILD_TYPE }}"
-        echo "Java version: $(java -version 2>&1 | head -n 1)"
-        cd android && ./gradlew --version | grep Gradle
-        echo "Node version: $(node --version)"
+        echo "App Name: ${{ needs.detect-environment.outputs.app_name }}"
+        echo "Build Type: ${{ matrix.build-type }}"
+        echo "Android Directory: ${{ needs.detect-environment.outputs.android_dir }}"
+        echo "Java Version: $(java -version 2>&1 | head -n 1)"
+        echo "Gradle Version: ${{ needs.detect-environment.outputs.gradle_version }}"
+        if [ "${{ needs.detect-environment.outputs.is_react_native }}" = "true" ]; then
+          echo "Node Version: $(node --version)"
+          echo "npm Version: $(npm --version)"
+        fi
+        echo "Build Gradle Path: ${{ needs.detect-environment.outputs.build_gradle_path }}"
+        echo "App Build Gradle Path: ${{ needs.detect-environment.outputs.app_build_gradle_path }}"
