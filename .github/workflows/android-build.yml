@@ -1,4 +1,4 @@
-name: react-native Release Build
+name: android Release Build
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ on:
     branches: [ "main" ]
 
 env:
-  APP_NAME: "MyCoolApp"
+  APP_NAME: "MyAndroidApp"
   BUILD_TYPE: "release"
   SERVICE: "ci-service"
 
@@ -21,37 +21,25 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Setup Node
-      uses: actions/setup-node@v3
+    - name: Set up JDK
+      uses: actions/setup-java@v3
       with:
-        node-version: '16'
+        java-version: '11'
+        distribution: 'temurin'
+        cache: 'gradle'
 
-    - name: Install dependencies
-      run: npm install
+    - name: Validate Gradle Wrapper
+      uses: gradle/wrapper-validation-action@v2
 
-    - name: Android Build
-      if: matrix.os == 'ubuntu-latest'
+    - name: Build with Gradle
       run: |
-        cd android && ./gradlew assembleRelease
+        ./gradlew assembleRelease --no-daemon --stacktrace
 
-    - name: Upload Android Artifact
-      if: matrix.os == 'ubuntu-latest'
+    - name: Upload APK artifact
       uses: actions/upload-artifact@v4
       with:
-        name: android-release
-        path: android/app/build/outputs/apk/release/app-release.apk
-
-    - name: iOS Build
-      if: matrix.os == 'macos-latest'
-      run: |
-        cd ios && pod install && xcodebuild ...
-
-    - name: Upload iOS Artifact
-      if: matrix.os == 'macos-latest'
-      uses: actions/upload-artifact@v4
-      with:
-        name: ios-release
-        path: ios/build/App.ipa
+        name: MyAndroidApp-release
+        path: app/build/outputs/apk/release/app-release.apk
 
     - name: Show build info
       run: |
