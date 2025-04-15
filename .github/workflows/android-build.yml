@@ -32,23 +32,26 @@ jobs:
           yes | sdkmanager --licenses
           sdkmanager --update
 
-      # Étape 5 : Installation de Node.js (utile pour React Native)
+      # Étape 5 : Installation de Node.js si besoin (React Native)
       - name: Install Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
 
-      # Étape 6 : Installation des dépendances npm
+      # Étape 6 : Installation des dépendances npm (si applicable)
       - name: Install npm dependencies
-        run: npm ci
-
-      # Étape 7 : Vérification/Création du keystore de debug
-      - name: Generate debug keystore with proper alias
         run: |
-          mkdir -p android/app
+          if [ -f package.json ]; then
+            npm ci
+          fi
+
+      # Étape 7 : Générer le debug.keystore si requis
+      - name: Generate debug keystore
+        run: |
+          mkdir -p app
           keytool -genkeypair \
             -v \
-            -keystore android/app/debug.keystore \
+            -keystore app/debug.keystore \
             -alias androiddebugkey \
             -storepass android \
             -keypass android \
@@ -58,20 +61,18 @@ jobs:
             -dname "CN=Android Debug,O=Android,C=US" \
             -deststoretype pkcs12
 
-      # Étape 8 : Donne les permissions à gradlew
+      # Étape 8 : Donner les permissions à gradlew
       - name: Grant execute permission to gradlew
-        run: chmod +x android/gradlew
+        run: chmod +x ./gradlew
 
       # Étape 9 : Compilation de l’APK debug
       - name: Build APK
-        run: |
-          cd android
-          ./gradlew assembleDebug --no-daemon --stacktrace --info
+        run: ./gradlew assembleDebug --no-daemon --stacktrace --info
 
-      # Étape 10 : Téléversement de l’APK généré
+      # Étape 10 : Upload de l'APK
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: debug-apk
-          path: android/app/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/debug/*.apk
           retention-days: 7
