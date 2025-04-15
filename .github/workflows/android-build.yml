@@ -1,11 +1,3 @@
-name: Android Debug Build
-
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -14,7 +6,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Important pour React Native
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -24,8 +16,8 @@ jobs:
 
       - name: Install npm dependencies
         run: |
-          npm ci --legacy-peer-deps  # Ignore les conflits de dépendances
-          cd android && ./gradlew clean
+          npm ci --legacy-peer-deps
+          ./gradlew clean  # Pas besoin de cd android
 
       - name: Set up JDK 17
         uses: actions/setup-java@v3
@@ -43,10 +35,10 @@ jobs:
 
       - name: Generate debug keystore
         run: |
-          mkdir -p android/app
+          mkdir -p app
           keytool -genkeypair \
             -v \
-            -keystore android/app/debug.keystore \
+            -keystore app/debug.keystore \
             -alias androiddebugkey \
             -storepass android \
             -keypass android \
@@ -55,24 +47,13 @@ jobs:
             -validity 10000 \
             -dname "CN=Android Debug,O=Android,C=US"
 
-      - name: Ensure Android folder is set up
-        run: |
-          # Si le répertoire android n'existe pas, génère-le via React Native
-          if [ ! -d "android" ]; then
-            npx react-native upgrade
-          fi
-
       - name: Build Android app
         run: |
-          cd android
-          ./gradlew assembleDebug \
-            --no-daemon \
-            --stacktrace \
-            --info
+          ./gradlew assembleDebug --no-daemon --stacktrace --info
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
-          path: android/app/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/debug/*.apk
           retention-days: 7
