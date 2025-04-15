@@ -38,6 +38,16 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
+      # Install Node.js dependencies
+      - name: Install Node.js dependencies
+        run: |
+          cd android
+          npm install
+
+      # Clean Gradle cache
+      - name: Clean Gradle cache
+        run: ./gradlew clean
+
       # Ensure gradlew has execute permissions
       - name: Change gradlew permissions
         run: chmod +x ./gradlew
