@@ -37,11 +37,6 @@ jobs:
     - name: Install npm dependencies
       run: npm install
 
-    - name: Clean Android build & Gradle caches (optional)
-      run: |
-        cd android
-        ./gradlew clean
-
     - name: Accept Android SDK licenses
       run: yes | sudo sdkmanager --licenses || true
 
@@ -49,19 +44,15 @@ jobs:
       uses: gradle/wrapper-validation-action@v2
 
     - name: Build APK with Gradle
-      run: |
-        cd android
-        ./gradlew assembleRelease --no-daemon --stacktrace
+      run: ./gradlew assembleRelease --no-daemon --stacktrace
 
     - name: Upload release APK artifact
       uses: actions/upload-artifact@v4
       with:
         name: MyAndroidApp-release
-        path: android/app/build/outputs/apk/release/app-release.apk
+        path: app/build/outputs/apk/release/app-release.apk
 
     - name: Show build info
       run: |
         echo "App: ${{ env.APP_NAME }}"
-        echo "Version: 1.2.3"
         echo "Build type: ${{ env.BUILD_TYPE }}"
-        echo "Service: ${{ env.SERVICE }}"
