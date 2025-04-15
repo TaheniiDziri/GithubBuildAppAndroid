@@ -24,6 +24,9 @@ jobs:
       with:
         fetch-depth: 0
 
+    - name: Update Gradle Wrapper to 7.6
+      run: ./gradlew wrapper --gradle-version 7.6 --distribution-type=all
+
     - name: Set up JDK 17
       uses: actions/setup-java@v3
       with:
@@ -49,7 +52,16 @@ jobs:
         cache: 'npm'
 
     - name: Install npm dependencies
-      run: npm ci
+      run: |
+        rm -rf node_modules
+        npm install
+
+    - name: Check native_modules.gradle presence
+      run: |
+        if [ ! -f node_modules/@react-native-community/cli-platform-android/native_modules.gradle ]; then
+          echo "❌ Erreur : Le fichier native_modules.gradle est manquant. Vérifiez vos dépendances npm."
+          exit 1
+        fi
 
     - name: Set up Android SDK
       uses: android-actions/setup-android@v3
@@ -88,5 +100,4 @@ jobs:
         echo "Build type: ${{ env.BUILD_TYPE }}"
         echo "Java version: $(java -version 2>&1 | head -n 1)"
         echo "Gradle version: $(./gradlew --version | grep Gradle)"
-        echo "Android SDK: $(sdkmanager --version)"
         echo "Node version: $(node --version)"
