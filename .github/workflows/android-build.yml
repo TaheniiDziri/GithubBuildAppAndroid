@@ -1,49 +1,61 @@
-name: React Native CI/CD Pipeline
+name: react-native Release Build
 
 on:
+  workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
   pull_request:
-    branches:
-      - main
+    branches: [ "main" ]
+
+env:
+  APP_NAME: "MyCoolApp"
+  BUILD_TYPE: "release"
+  SERVICE: "ci-service"
 
 jobs:
   build:
+    name: Build release
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout the code from the repository
-      - name: Checkout Code
-        uses: actions/checkout@v2
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      # 2. Set up Node.js
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '16'  # Utiliser la version de Node.js adéquate
+    - name: Setup Node
+      uses: actions/setup-node@v3
+      with:
+        node-version: '16'
 
-      # 3. Cache npm dependencies
-      - name: Cache npm dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-npm-
+    - name: Install dependencies
+      run: npm install
 
-      # 4. Install npm dependencies
-      - name: Install Dependencies
-        run: npm install
+    - name: Android Build
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        cd android && ./gradlew assembleRelease
 
-            # 5. Build Android (if the folder exists)
-      - name: Build Android (using gradlew)
-        id: android_build
-        run: |
-          if [ -d "android" ]; then
-            cd android
-            ./gradlew clean
-            ./gradlew assembleRelease
-          else
-            echo "❌ Dossier 'android' introuvable. Build Android ignoré."
-          fi
+    - name: Upload Android Artifact
+      if: matrix.os == 'ubuntu-latest'
+      uses: actions/upload-artifact@v4
+      with:
+        name: android-release
+        path: android/app/build/outputs/apk/release/app-release.apk
+
+    - name: iOS Build
+      if: matrix.os == 'macos-latest'
+      run: |
+        cd ios && pod install && xcodebuild ...
+
+    - name: Upload iOS Artifact
+      if: matrix.os == 'macos-latest'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ios-release
+        path: ios/build/App.ipa
+
+    - name: Show build info
+      run: |
+        echo "App: ${{ env.APP_NAME }}"
+        echo "Version: 1.2.3"
+        echo "Build type: ${{ env.BUILD_TYPE }}"
+        echo "Service: ${{ env.SERVICE }}"
