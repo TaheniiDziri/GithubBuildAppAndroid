@@ -22,11 +22,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0  # Pour avoir l'historique complet des commits
-
-    # Solution recommandée : mise à jour de Gradle pour supporter Java 17
-    - name: Update Gradle Wrapper
-      run: ./gradlew wrapper --gradle-version 7.6 --distribution-type=all
+        fetch-depth: 0
 
     - name: Set up JDK 17
       uses: actions/setup-java@v3
