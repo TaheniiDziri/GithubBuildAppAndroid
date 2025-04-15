@@ -14,18 +14,20 @@
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="true" tools:targetApi="28">
 
-        <activity android:name=".MainActivity"
-            android:exported="true"> <!-- Ajout de android:exported -->
+        <activity android:name=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
+
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
         <activity android:name=".PropertyDetails"/>
+
         <activity android:name=".RNPropertyDetails"
             android:label="@string/app_name"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar"/>
+
         <activity android:name="com.facebook.react.devsupport.DevSettingsActivity" />
 
     </application>
