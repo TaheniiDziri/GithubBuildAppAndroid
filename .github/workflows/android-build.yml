@@ -43,7 +43,7 @@ jobs:
 
     # Optionally, upload the artifact (APK) to GitHub
     - name: Upload APK artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v2 # Utilise la version 2 qui est plus stable
       with:
         name: android-release-apk
         path: android/app/build/outputs/apk/release/app-release.apk
