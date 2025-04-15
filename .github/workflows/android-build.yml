@@ -53,11 +53,14 @@ jobs:
 
     - name: Install npm dependencies
       run: |
+        echo "🧹 Nettoyage de node_modules..."
         rm -rf node_modules
+        echo "📦 Installation des dépendances npm..."
         npm install
 
     - name: Check native_modules.gradle presence
       run: |
+        echo "🔍 Vérification de native_modules.gradle..."
         if [ ! -f node_modules/@react-native-community/cli-platform-android/native_modules.gradle ]; then
           echo "❌ Erreur : Le fichier native_modules.gradle est manquant. Vérifiez vos dépendances npm."
           exit 1
