@@ -35,22 +35,32 @@ jobs:
         cache: 'npm'
 
     - name: Install npm dependencies
-      run: npm install
+      run: npm ci
+
+    - name: Set up Android SDK
+      uses: android-actions/setup-android@v3
 
     - name: Accept Android SDK licenses
-      run: yes | sudo sdkmanager --licenses || true
+      run: yes | sdkmanager --licenses
+
+    - name: Pre-build cleanup
+      run: |
+        cd android
+        ./gradlew clean
+        cd ..
 
     - name: Validate Gradle Wrapper
       uses: gradle/wrapper-validation-action@v2
 
     - name: Build APK with Gradle
+      working-directory: android
       run: ./gradlew assembleRelease --no-daemon --stacktrace
 
     - name: Upload release APK artifact
       uses: actions/upload-artifact@v4
       with:
         name: MyAndroidApp-release
-        path: app/build/outputs/apk/release/app-release.apk
+        path: android/app/build/outputs/apk/release/app-release.apk
 
     - name: Show build info
       run: |
