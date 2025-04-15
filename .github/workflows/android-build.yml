@@ -40,9 +40,7 @@ jobs:
 
       # Install Node.js dependencies
       - name: Install Node.js dependencies
-        run: |
-          cd android
-          npm install
+        run: npm install
 
       # Clean Gradle cache
       - name: Clean Gradle cache
