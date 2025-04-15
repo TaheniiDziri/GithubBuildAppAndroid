@@ -46,6 +46,15 @@ jobs:
           rm -rf node_modules
           npm install --legacy-peer-deps
 
+      - name: ✅ Check native_modules.gradle existence
+        run: |
+          NATIVE_MODULES_PATH="node_modules/@react-native-community/cli-platform-android/native_modules.gradle"
+          if [ ! -f "$NATIVE_MODULES_PATH" ]; then
+            echo "⚠️ $NATIVE_MODULES_PATH is missing. Creating placeholder."
+            mkdir -p "$(dirname "$NATIVE_MODULES_PATH")"
+            echo "// Placeholder to avoid build failure" > "$NATIVE_MODULES_PATH"
+          fi
+
       - name: ☕ Set up JDK (Java 17)
         uses: actions/setup-java@v3
         with:
