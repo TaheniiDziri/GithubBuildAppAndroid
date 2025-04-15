@@ -1,112 +1,59 @@
-name: Android Release Build
+name: Build and Test React Native App
 
 on:
-  workflow_dispatch:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
   pull_request:
-    branches: [ "main" ]
-
-env:
-  APP_NAME: "MonApp"
-  BUILD_TYPE: "release"
-  SERVICE: "ci-service"
-  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true"
-  NODE_OPTIONS: "--openssl-legacy-provider"
+    branches:
+      - main
 
 jobs:
   build:
-    name: Build release
     runs-on: ubuntu-latest
-
+    
     steps:
-      - name: 📥 Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+    # 1. Checkout le code du repository
+    - name: Checkout code
+      uses: actions/checkout@v2
 
-      - name: 📦 Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-          cache: 'npm'
+    # 2. Installer Node.js (version 16 ici, tu peux ajuster si nécessaire)
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '16'
 
-      - name: ♻️ Cache npm dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.npm
-            node_modules
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-      - name: 📦 Install npm dependencies
-        run: |
-          rm -rf node_modules
-          npm install --legacy-peer-deps
-      - name: 🧩 Vérifier et créer le fichier native_modules.gradle si manquant
-        run: |
-          if [ ! -f node_modules/@react-native-community/cli-platform-android/native_modules.gradle ]; then
-            echo "⚠️ Fichier native_modules.gradle manquant. Création d’un placeholder..."
-            mkdir -p node_modules/@react-native-community/cli-platform-android
-            echo "// Placeholder" > node_modules/@react-native-community/cli-platform-android/native_modules.gradle
-          fi
-      - name: ☕ Set up JDK (Java 17)
-        uses: actions/setup-java@v3
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: gradle
+    # 3. Installer les dépendances avec npm
+    - name: Install dependencies
+      run: |
+        # Nettoyer le dossier node_modules au cas où
+        rm -rf node_modules
+        # Installer les dépendances définies dans package.json
+        npm install
 
-      - name: 📦 Cache Gradle dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-      - name: 📲 Set up Android SDK
-        uses: android-actions/setup-android@v3
+    # 4. Nettoyer le projet avec Gradle (utile si des artefacts anciens peuvent causer des erreurs)
+    - name: Clean project with Gradle
+      run: ./gradlew clean
 
-      - name: ✅ Accept Android SDK licenses
-        run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager --update
+    # 5. Construire le projet React Native avec Gradle
+    - name: Build project
+      run: ./gradlew build
 
-      - name: 🧹 Pre-build cleanup
-        run: ./gradlew clean
+    # 6. Créer un APK de production (si c'est un projet Android)
+    - name: Build APK
+      run: ./gradlew assembleRelease
 
-      - name: ✅ Validate Gradle Wrapper
-        uses: gradle/wrapper-validation-action@v2
+    # 7. Optionnel : Exécuter les tests pour valider le projet
+    - name: Run tests
+      run: ./gradlew test
 
-      - name: Télécharger Gradle 7.6 manuellement
-        run: |
-          curl -sSL https://services.gradle.org/distributions/gradle-7.6-all.zip -o gradle-7.6-all.zip
-          unzip -d /home/runner/.gradle/wrapper/dists gradle-7.6-all.zip
-          chmod +x /home/runner/.gradle/wrapper/dists/gradle-7.6-all/gradle-7.6/bin/gradle
+    # 8. Optionnel : Sauvegarder l'APK généré comme artefact
+    - name: Upload APK as artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: app-release-apk
+        path: android/app/build/outputs/apk/release/app-release.apk
 
-      - name: 🏗️ Build APK and AAB with Gradle
-        run: |
-          ./gradlew assembleRelease bundleRelease \
-            --no-daemon \
-            --stacktrace \
-            --info
-      - name: 📤 Upload release APK and AAB
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.APP_NAME }}-release
-          path: |
-            app/build/outputs/apk/release/*.apk
-            app/build/outputs/bundle/release/*.aab
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: ℹ️ Show build info
-        run: |
-          echo "=== Build Information ==="
-          echo "App: ${{ env.APP_NAME }}"
-          echo "Build type: ${{ env.BUILD_TYPE }}"
-          echo "Java version: $(java -version 2>&1 | head -n 1)"
-          ./gradlew --version | grep Gradle
+    # 9. Optionnel : Publier l'APK sur un store (exemple ici pour Google Play)
+    # Tu peux ajouter une étape pour télécharger l'APK sur un store, par exemple Google Play.
+    # Pour cela, tu devras configurer un outil comme [fastlane](https://fastlane.tools/)
