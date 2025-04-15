@@ -48,10 +48,25 @@ jobs:
     - name: Update Gradle Wrapper to 7.6
       run: ./gradlew wrapper --gradle-version 7.6 --distribution-type=all
 
-    - name: Set up JDK 17
+    - name: Extract Gradle version and set Java version
+      run: |
+        # Extract the Gradle version from gradle-wrapper.properties
+        gradle_version=$(grep "distributionUrl" android/gradle/wrapper/gradle-wrapper.properties | sed 's/.*gradle-\(.*\)-bin.*/\1/')
+        echo "Detected Gradle version: $gradle_version"
+
+        # Set Java version based on Gradle version (simplified mapping)
+        if [[ "$gradle_version" == 8.* ]]; then
+          echo "java_version=17" >> $GITHUB_ENV
+        elif [[ "$gradle_version" == 7.* ]]; then
+          echo "java_version=11" >> $GITHUB_ENV
+        else
+          echo "java_version=8" >> $GITHUB_ENV
+        fi
+
+    - name: Set up JDK
       uses: actions/setup-java@v3
       with:
-        java-version: '17'
+        java-version: ${{ env.java_version }}
         distribution: 'temurin'
         cache: gradle
         check-latest: true
