@@ -1,3 +1,13 @@
+name: Android Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -17,7 +27,7 @@ jobs:
       - name: Install npm dependencies
         run: |
           npm ci --legacy-peer-deps
-          ./gradlew clean  # Pas besoin de cd android
+          ./gradlew clean
 
       - name: Set up JDK 17
         uses: actions/setup-java@v3
