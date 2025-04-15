@@ -64,7 +64,7 @@ jobs:
 
       - name: Build APK
         run: |
-          cd android
+        
           ./gradlew assembleDebug \
             --no-daemon \
             --stacktrace \
