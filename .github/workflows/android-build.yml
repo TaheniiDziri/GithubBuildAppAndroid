@@ -40,21 +40,17 @@ jobs:
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-
-
       - name: 📦 Install npm dependencies
         run: |
           rm -rf node_modules
           npm install --legacy-peer-deps
-
-      - name: ✅ Check native_modules.gradle existence
+      - name: 🧩 Vérifier et créer le fichier native_modules.gradle si manquant
         run: |
-          NATIVE_MODULES_PATH="node_modules/@react-native-community/cli-platform-android/native_modules.gradle"
-          if [ ! -f "$NATIVE_MODULES_PATH" ]; then
-            echo "⚠️ $NATIVE_MODULES_PATH is missing. Creating placeholder."
-            mkdir -p "$(dirname "$NATIVE_MODULES_PATH")"
-            echo "// Placeholder to avoid build failure" > "$NATIVE_MODULES_PATH"
+          if [ ! -f node_modules/@react-native-community/cli-platform-android/native_modules.gradle ]; then
+            echo "⚠️ Fichier native_modules.gradle manquant. Création d’un placeholder..."
+            mkdir -p node_modules/@react-native-community/cli-platform-android
+            echo "// Placeholder" > node_modules/@react-native-community/cli-platform-android/native_modules.gradle
           fi
-
       - name: ☕ Set up JDK (Java 17)
         uses: actions/setup-java@v3
         with:
@@ -71,7 +67,6 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
-
       - name: 📲 Set up Android SDK
         uses: android-actions/setup-android@v3
 
@@ -86,13 +81,18 @@ jobs:
       - name: ✅ Validate Gradle Wrapper
         uses: gradle/wrapper-validation-action@v2
 
+      - name: Télécharger Gradle 7.6 manuellement
+        run: |
+          curl -sSL https://services.gradle.org/distributions/gradle-7.6-all.zip -o gradle-7.6-all.zip
+          unzip -d /home/runner/.gradle/wrapper/dists gradle-7.6-all.zip
+          chmod +x /home/runner/.gradle/wrapper/dists/gradle-7.6-all/gradle-7.6/bin/gradle
+
       - name: 🏗️ Build APK and AAB with Gradle
         run: |
           ./gradlew assembleRelease bundleRelease \
             --no-daemon \
             --stacktrace \
             --info
-
       - name: 📤 Upload release APK and AAB
         uses: actions/upload-artifact@v4
         with:
