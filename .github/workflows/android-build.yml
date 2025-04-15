@@ -11,6 +11,7 @@ env:
   APP_NAME: "MyAndroidApp"
   BUILD_TYPE: "release"
   SERVICE: "ci-service"
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true"
 
 jobs:
   build:
@@ -20,15 +21,30 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Pour avoir l'historique complet des commits
 
-    # Le problème principal vient de l'incompatibilité entre Gradle 6.8 et Java 17
-    # Solution : soit utiliser Java 11, soit mettre à jour Gradle
-    - name: Set up JDK 11 (compatible avec Gradle 6.8)
+    # Solution recommandée : mise à jour de Gradle pour supporter Java 17
+    - name: Update Gradle Wrapper
+      run: ./gradlew wrapper --gradle-version 7.6 --distribution-type=all
+
+    - name: Set up JDK 17
       uses: actions/setup-java@v3
       with:
-        java-version: '11'  # Changé de 17 à 11 pour compatibilité
+        java-version: '17'
         distribution: 'temurin'
         cache: gradle
+        check-latest: true
+
+    - name: Cache Gradle dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
 
     - name: Set up Node.js
       uses: actions/setup-node@v3
@@ -45,30 +61,36 @@ jobs:
     - name: Accept Android SDK licenses
       run: yes | sdkmanager --licenses
 
-    # Alternative : mettre à jour Gradle pour supporter Java 17
-    # - name: Update Gradle Wrapper
-    #   run: ./gradlew wrapper --gradle-version 7.4.2
-
     - name: Pre-build cleanup
-      run: |
-        ./gradlew clean
-        
+      run: ./gradlew clean
+
     - name: Validate Gradle Wrapper
       uses: gradle/wrapper-validation-action@v2
 
     - name: Build APK with Gradle
       run: |
-        ./gradlew assembleRelease --no-daemon --stacktrace
-        
+        ./gradlew assembleRelease \
+          --no-daemon \
+          --stacktrace \
+          --info \
+          --scan
+
     - name: Upload release APK artifact
       uses: actions/upload-artifact@v4
       with:
-        name: MyAndroidApp-release
-        path: app/build/outputs/apk/release/app-release.apk
+        name: ${{ env.APP_NAME }}-release
+        path: |
+          app/build/outputs/apk/release/*.apk
+          app/build/outputs/bundle/release/*.aab
+        if-no-files-found: error
+        retention-days: 7
 
     - name: Show build info
       run: |
+        echo "=== Build Information ==="
         echo "App: ${{ env.APP_NAME }}"
         echo "Build type: ${{ env.BUILD_TYPE }}"
         echo "Java version: $(java -version 2>&1 | head -n 1)"
         echo "Gradle version: $(./gradlew --version | grep Gradle)"
+        echo "Android SDK: $(sdkmanager --version)"
+        echo "Node version: $(node --version)"
