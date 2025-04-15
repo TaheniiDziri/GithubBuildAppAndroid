@@ -2,5 +2,5 @@ include ':app'
 
 rootProject.name = "Android React Native App"
 
-// Appliquer la configuration React Native depuis le fichier react.gradle
-apply from: file("../node_modules/react-native/react.gradle")
+// Ancienne ligne à supprimer ou commenter car le fichier n'existe plus
+// apply from: file("../node_modules/react-native/react.gradle")
