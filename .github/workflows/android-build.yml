@@ -1,59 +1,52 @@
-name: Build and Test React Native App
+name: Build Android App
 
 on:
   push:
     branches:
       - main
   pull_request:
-    branches:
-      - main
 
 jobs:
   build:
+    name: Android Build
     runs-on: ubuntu-latest
-    
+
     steps:
-    # 1. Checkout le code du repository
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    # 2. Installer Node.js (version 16 ici, tu peux ajuster si nécessaire)
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '16'
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: 11
 
-    # 3. Installer les dépendances avec npm
-    - name: Install dependencies
-      run: |
-        # Nettoyer le dossier node_modules au cas où
-        rm -rf node_modules
-        # Installer les dépendances définies dans package.json
-        npm install
+      - name: Cache Gradle
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}
 
-    # 4. Nettoyer le projet avec Gradle (utile si des artefacts anciens peuvent causer des erreurs)
-    - name: Clean project with Gradle
-      run: ./gradlew clean
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
 
-    # 5. Construire le projet React Native avec Gradle
-    - name: Build project
-      run: ./gradlew build
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
 
-    # 6. Créer un APK de production (si c'est un projet Android)
-    - name: Build APK
-      run: ./gradlew assembleRelease
+      - name: Install NPM dependencies
+        run: npm install
 
-    # 7. Optionnel : Exécuter les tests pour valider le projet
-    - name: Run tests
-      run: ./gradlew test
+      - name: Build Android App
+        run: ./gradlew assembleRelease
 
-    # 8. Optionnel : Sauvegarder l'APK généré comme artefact
-    - name: Upload APK as artifact
-      uses: actions/upload-artifact@v2
-      with:
-        name: app-release-apk
-        path: android/app/build/outputs/apk/release/app-release.apk
-
-    # 9. Optionnel : Publier l'APK sur un store (exemple ici pour Google Play)
-    # Tu peux ajouter une étape pour télécharger l'APK sur un store, par exemple Google Play.
-    # Pour cela, tu devras configurer un outil comme [fastlane](https://fastlane.tools/)
+      - name: Upload APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: app-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
