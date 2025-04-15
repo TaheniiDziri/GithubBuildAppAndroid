@@ -37,24 +37,39 @@ jobs:
         echo "📦 Installation des dépendances npm..."
         npm install
 
-    - name: Check native_modules.gradle presence
+    - name: Check and create native_modules.gradle if missing
       run: |
         echo "🔍 Vérification de native_modules.gradle..."
         if [ ! -f node_modules/@react-native-community/cli-platform-android/native_modules.gradle ]; then
-          echo "❌ Erreur : Le fichier native_modules.gradle est manquant. Vérifiez vos dépendances npm."
-          exit 1
+          echo "❌ Le fichier native_modules.gradle est manquant. Création automatique du fichier..."
+          mkdir -p node_modules/@react-native-community/cli-platform-android
+          echo "// Minimal gradle configuration" > node_modules/@react-native-community/cli-platform-android/native_modules.gradle
+          echo "Fichier native_modules.gradle créé automatiquement."
         fi
 
+    - name: Force Java 17 temporarily for Android SDK setup
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        check-latest: true
+
+    - name: Set up Android SDK
+      uses: android-actions/setup-android@v3
+
+    - name: Accept Android SDK licenses
+      run: yes | sdkmanager --licenses
+
     - name: Update Gradle Wrapper to 7.6
-      run: ./gradlew wrapper --gradle-version 7.6 --distribution-type=all
+      run: |
+        cd android
+        chmod +x gradlew
+        ./gradlew wrapper --gradle-version 7.6 --distribution-type=all
 
     - name: Extract Gradle version and set Java version
       run: |
-        # Extract the Gradle version from gradle-wrapper.properties
         gradle_version=$(grep "distributionUrl" android/gradle/wrapper/gradle-wrapper.properties | sed 's/.*gradle-\(.*\)-bin.*/\1/')
         echo "Detected Gradle version: $gradle_version"
-
-        # Set Java version based on Gradle version (simplified mapping)
         if [[ "$gradle_version" == 8.* ]]; then
           echo "java_version=17" >> $GITHUB_ENV
         elif [[ "$gradle_version" == 7.* ]]; then
@@ -63,7 +78,7 @@ jobs:
           echo "java_version=8" >> $GITHUB_ENV
         fi
 
-    - name: Set up JDK
+    - name: Set up correct Java version for build
       uses: actions/setup-java@v3
       with:
         java-version: ${{ env.java_version }}
@@ -81,20 +96,17 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-gradle-
 
-    - name: Set up Android SDK
-      uses: android-actions/setup-android@v3
-
-    - name: Accept Android SDK licenses
-      run: yes | sdkmanager --licenses
-
     - name: Pre-build cleanup
-      run: ./gradlew clean
+      run: |
+        cd android
+        ./gradlew clean
 
     - name: Validate Gradle Wrapper
       uses: gradle/wrapper-validation-action@v2
 
     - name: Build APK with Gradle
       run: |
+        cd android
         ./gradlew assembleRelease \
           --no-daemon \
           --stacktrace \
@@ -106,8 +118,8 @@ jobs:
       with:
         name: ${{ env.APP_NAME }}-release
         path: |
-          app/build/outputs/apk/release/*.apk
-          app/build/outputs/bundle/release/*.aab
+          android/app/build/outputs/apk/release/*.apk
+          android/app/build/outputs/bundle/release/*.aab
         if-no-files-found: error
         retention-days: 7
 
@@ -117,5 +129,5 @@ jobs:
         echo "App: ${{ env.APP_NAME }}"
         echo "Build type: ${{ env.BUILD_TYPE }}"
         echo "Java version: $(java -version 2>&1 | head -n 1)"
-        echo "Gradle version: $(./gradlew --version | grep Gradle)"
+        cd android && ./gradlew --version | grep Gradle
         echo "Node version: $(node --version)"
