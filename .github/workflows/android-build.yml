@@ -1,56 +1,127 @@
-name: Android Build
+name: Android Debug Build
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   pull_request:
+    branches: [ main ]
 
 jobs:
   build:
-    name: Build Android App
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      # Étape 1: Checkout du code
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
+      # Étape 2: Vérification de la structure du projet
+      - name: Vérification de la structure du projet
+        run: |
+          echo "Vérification de la structure du projet..."
+          if [ ! -d "android" ]; then
+            echo "Le répertoire 'android' est manquant. Assurez-vous que c'est un projet Android ou React Native."
+            exit 1
+          fi
+          if [ ! -f "package.json" ]; then
+            echo "Le fichier 'package.json' est manquant. Assurez-vous que c'est un projet React Native."
+            exit 1
+          fi
+          if [ ! -f "android/build.gradle" ]; then
+            echo "Le fichier 'android/build.gradle' est manquant."
+            exit 1
+          fi
+          echo "Structure du projet validée."
 
-      - name: Install Yarn
-        run: npm install -g yarn
+      # Étape 3: Installation manuelle propre du SDK Android
+      - name: Install Android SDK (cmdline-tools)
+        run: |
+          echo "Installation du SDK Android..."
+          mkdir -p android-sdk/cmdline-tools
+          wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O sdk.zip
+          unzip sdk.zip -d tmp-sdk
+          mv tmp-sdk/cmdline-tools android-sdk/cmdline-tools/latest
+          rm -rf tmp-sdk sdk.zip
+          echo "ANDROID_HOME=$PWD/android-sdk" >> $GITHUB_ENV
+          echo "$PWD/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "$PWD/android-sdk/platform-tools" >> $GITHUB_PATH
+          # Set ANDROID_SDK_ROOT to match ANDROID_HOME
+          echo "ANDROID_SDK_ROOT=$PWD/android-sdk" >> $GITHUB_ENV
 
-      - name: Install dependencies
-        run: yarn install
+      # Étape 4: Acceptation des licences et installation des composants nécessaires
+      - name: Accepter les licences SDK et installer les composants nécessaires
+        run: |
+          echo "Accepter les licences SDK Android..."
+          yes | sdkmanager --licenses  # Accepter toutes les licences automatiquement
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;30.0.3"  # Installe les composants nécessaires
+          sdkmanager --update  # Mise à jour des composants SDK pour s'assurer que tout est à jour
 
-      - name: Cache Gradle
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            gradle-${{ runner.os }}-
+      # Étape 5: Détecter la version de Node.js et installer
+      - name: Détecter la version de Node.js et installer
+        run: |
+          if [ -f "package.json" ]; then
+            echo "Détection de la version de Node.js à partir de package.json..."
+            node_version=$(jq -r '.engines.node' package.json)
+            if [ "$node_version" == "null" ] || [ -z "$node_version" ]; then
+              node_version="18"
+              echo "Aucune version définie, utilisation de Node.js $node_version par défaut."
+            fi
+          else
+            node_version="18"
+            echo "Pas de package.json trouvé, utilisation de Node.js $node_version."
+          fi
+          major_version=${node_version%%.*}
+          curl -sL https://deb.nodesource.com/setup_${major_version}.x | sudo -E bash -
+          sudo apt-get install -y nodejs
 
-      - name: Set up JDK 11
+      # Étape 6: Installation des dépendances npm
+      - name: Installer les dépendances npm
+        run: npm ci
+
+      # Étape 7: Installation de JDK 17
+      - name: Set up JDK 17
         uses: actions/setup-java@v3
         with:
-          java-version: 11
           distribution: 'temurin'
+          java-version: '17'
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x android/gradlew
+      # **NOUVEAU** : Ajouter compileSdkVersion si manquant
+      - name: Ajouter compileSdkVersion si manquant
+        run: |
+          if ! grep -q "compileSdkVersion" android/build.gradle; then
+            echo "Ajout de compileSdkVersion = 33"
+            sed -i '/ext {/a\        compileSdkVersion = 33' android/build.gradle
+          fi
 
-      - name: Build Android app
+      # **NOUVEAU** : Corriger le plugin 'maven' de react-native-reanimated
+      - name: Corriger le plugin 'maven' de react-native-reanimated
+        run: |
+          FILE="node_modules/react-native-reanimated/android/build.gradle"
+          if grep -q "apply plugin: 'maven'" "$FILE"; then
+            sed -i "s/apply plugin: 'maven'/apply plugin: 'maven-publish'/" "$FILE"
+          fi
+
+      # **NOUVEAU** : Générer un keystore de débogage
+      - name: Générer un keystore de débogage
+        run: |
+          keytool -genkeypair \
+            -v \
+            -keystore android/app/debug.keystore \
+            -alias androiddebugkey \
+            -storepass android \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US" \
+            -deststoretype pkcs12
+          # Vérification que le keystore a été créé correctement
+          keytool -list -v \
+            -keystore android/app/debug.keystore \
+            -alias androiddebugkey \
+            -storepass android
+
+      # Étape 8: Build Android Debug APK
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
         working-directory: android
-        run: ./gradlew assembleRelease
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v3
-        with:
-          name: app-release.apk
-          path: android/app/build/outputs/apk/release/app-release.apk
