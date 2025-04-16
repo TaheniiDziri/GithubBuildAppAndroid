@@ -19,16 +19,22 @@ jobs:
       - name: Vérification de la structure du projet
         run: |
           echo "Vérification de la structure du projet..."
-          if [ ! -d "android" ]; then
-            echo "Le répertoire 'android' est manquant. Assurez-vous que c'est un projet Android ou React Native."
+          
+          # Vérifie si le projet contient le dossier "android" ou si les fichiers sont à la racine
+          if [ -d "android" ]; then
+            echo "Structure classique détectée : répertoire 'android' trouvé."
+            PROJECT_DIR="android"
+          elif [ -f "build.gradle" ] && [ -d "node_modules" ]; then
+            echo "Structure alternative détectée : code Android à la racine du projet."
+            PROJECT_DIR="."
+          else
+            echo "Structure de projet non valide. Aucun répertoire 'android' trouvé et aucun fichier 'build.gradle' à la racine."
             exit 1
           fi
-          if [ ! -f "package.json" ]; then
-            echo "Le fichier 'package.json' est manquant. Assurez-vous que c'est un projet React Native."
-            exit 1
-          fi
-          if [ ! -f "android/build.gradle" ]; then
-            echo "Le fichier 'android/build.gradle' est manquant."
+
+          # Vérification du fichier "build.gradle" ou "package.json"
+          if [ ! -f "$PROJECT_DIR/build.gradle" ]; then
+            echo "Le fichier '$PROJECT_DIR/build.gradle' est manquant."
             exit 1
           fi
           echo "Structure du projet validée."
@@ -59,9 +65,9 @@ jobs:
       # Étape 5: Détecter la version de Node.js et installer
       - name: Détecter la version de Node.js et installer
         run: |
-          if [ -f "package.json" ]; then
+          if [ -f "$PROJECT_DIR/package.json" ]; then
             echo "Détection de la version de Node.js à partir de package.json..."
-            node_version=$(jq -r '.engines.node' package.json)
+            node_version=$(jq -r '.engines.node' "$PROJECT_DIR/package.json")
             if [ "$node_version" == "null" ] || [ -z "$node_version" ]; then
               node_version="18"
               echo "Aucune version définie, utilisation de Node.js $node_version par défaut."
@@ -88,15 +94,15 @@ jobs:
       # **NOUVEAU** : Ajouter compileSdkVersion si manquant
       - name: Ajouter compileSdkVersion si manquant
         run: |
-          if ! grep -q "compileSdkVersion" android/build.gradle; then
+          if ! grep -q "compileSdkVersion" "$PROJECT_DIR/build.gradle"; then
             echo "Ajout de compileSdkVersion = 33"
-            sed -i '/ext {/a\        compileSdkVersion = 33' android/build.gradle
+            sed -i '/ext {/a\        compileSdkVersion = 33' "$PROJECT_DIR/build.gradle"
           fi
 
       # **NOUVEAU** : Corriger le plugin 'maven' de react-native-reanimated
       - name: Corriger le plugin 'maven' de react-native-reanimated
         run: |
-          FILE="node_modules/react-native-reanimated/android/build.gradle"
+          FILE="$PROJECT_DIR/node_modules/react-native-reanimated/android/build.gradle"
           if grep -q "apply plugin: 'maven'" "$FILE"; then
             sed -i "s/apply plugin: 'maven'/apply plugin: 'maven-publish'/" "$FILE"
           fi
@@ -106,7 +112,7 @@ jobs:
         run: |
           keytool -genkeypair \
             -v \
-            -keystore android/app/debug.keystore \
+            -keystore "$PROJECT_DIR/debug.keystore" \
             -alias androiddebugkey \
             -storepass android \
             -keypass android \
@@ -117,11 +123,11 @@ jobs:
             -deststoretype pkcs12
           # Vérification que le keystore a été créé correctement
           keytool -list -v \
-            -keystore android/app/debug.keystore \
+            -keystore "$PROJECT_DIR/debug.keystore" \
             -alias androiddebugkey \
             -storepass android
 
       # Étape 8: Build Android Debug APK
       - name: Build Debug APK
         run: ./gradlew assembleDebug
-        working-directory: android
+        working-directory: $PROJECT_DIR
